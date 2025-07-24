@@ -3,8 +3,8 @@ Stream Rigid-Bodies + Labeled-Markers ▶ CSV 저장 (장시간 안정 버전)
 ────────────────────────────────────────────────
 • 실시간 스트리밍 (Capture 없이)
 • 주기적으로 데이터를 파일에 저장하여 메모리 문제 방지
-• CSV 파일의 Frame 열이 1부터 시작
-• Ctrl + C  → 남은 데이터 저장 후 종료
+• CSV 파일의 Frame 열이 1부터 시작 (QTM 리셋 감지)
+• Ctrl + C  → 남은 데이터 저장 후 종료 (종료 안정성 강화)
 """
 
 import asyncio
@@ -22,13 +22,10 @@ QTM_IP       = "127.0.0.1"
 QTM_PASSWORD = "password"
 
 # 데이터 저장 설정
-# 데이터를 파일에 얼마나 자주 저장할지 초 단위로 설정합니다. (예: 600초 = 10분)
 SAVE_INTERVAL_SECONDS = 600
-# 특정 리지드 바디 하나만 저장하려면 이름을 입력하고, 모두 저장하려면 None으로 두세요.
 WANTED_BODY  = None
 
 # QTM 파일 재생 모드 (실시간 스트리밍 시에는 None으로 설정)
-# 예: r"C:\QTM\YourFile.qtm"
 QTM_FILE     = None
 # ──────────────────────
 
@@ -71,7 +68,6 @@ def flush_data_to_disk():
 
     LOG.info(f"[{datetime.now().strftime('%H:%M:%S')}] 데이터를 파일에 저장합니다...")
 
-    # 리지드 바디 데이터 저장
     header_b = ["Frame", "Pos_X", "Pos_Y", "Pos_Z", "Roll", "Pitch", "Yaw"]
     for name, rows in body_rows.items():
         if not rows: continue
@@ -80,7 +76,6 @@ def flush_data_to_disk():
         df = pd.DataFrame(rows, columns=header_b)
         df.to_csv(path, mode='a', header=is_new_file, index=False)
 
-    # 마커 데이터 저장 (로직 개선)
     if any(marker_rows.values()):
         temp_dfs = []
         for key, rows in marker_rows.items():
@@ -95,7 +90,6 @@ def flush_data_to_disk():
             is_new_file = not path.exists()
             merged_df.to_csv(path, mode='a', header=is_new_file, index=True)
 
-    # 메모리 버퍼 비우기
     body_rows = {name: [] for name in body_rows}
     marker_rows = {name: [] for name in marker_rows}
     LOG.info("저장 완료. 메모리 버퍼를 비웠습니다.")
@@ -116,54 +110,59 @@ async def main():
 
     saver_task = asyncio.create_task(periodic_saver())
     
-    # [수정] 프레임 번호 오프셋 변수
     frame_offset = None
+    last_framenumber = -1
 
     try:
-        async with qtm.TakeControl(conn, QTM_PASSWORD):
-            if QTM_FILE:
-                await conn.load(QTM_FILE)
-                await conn.start(rtfromfile=True)
-                LOG.info(f"▶ '{QTM_FILE}' 파일 재생 중…")
-            else:
-                LOG.info("📡 실시간 스트리밍 시작… (Capture 없이)")
+        await conn.take_control(QTM_PASSWORD)
+        LOG.info("QTM 제어권을 획득했습니다.")
 
-            bmap = body_index(await conn.get_parameters(["6d"]))
-            xml3d = await conn.get_parameters(["3d"])
-            m_name_list = [e.text.strip() for e in ET.fromstring(xml3d).findall("*/Marker/Name")]
+        if QTM_FILE:
+            await conn.load(QTM_FILE)
+            await conn.start(rtfromfile=True)
+            LOG.info(f"▶ '{QTM_FILE}' 파일 재생 중…")
+        else:
+            LOG.info("📡 실시간 스트리밍 시작… (Capture 없이)")
 
-            def on_packet(pkt: qtm.QRTPacket):
-                """수신된 각 데이터 패킷을 처리하여 메모리 버퍼에 추가합니다."""
-                nonlocal frame_offset
-                
-                # [수정] 첫 프레임을 기준으로 오프셋 설정
-                if frame_offset is None:
-                    frame_offset = pkt.framenumber
-                
-                # [수정] 프레임 번호를 1부터 시작하도록 계산
-                relative_fnum = pkt.framenumber - frame_offset + 1
+        bmap = body_index(await conn.get_parameters(["6d"]))
+        xml3d = await conn.get_parameters(["3d"])
+        m_name_list = [e.text.strip() for e in ET.fromstring(xml3d).findall("*/Marker/Name")]
 
-                _, bodies = pkt.get_6d()
-                _, markers = pkt.get_3d_markers()
+        def on_packet(pkt: qtm.QRTPacket):
+            """수신된 각 데이터 패킷을 처리하여 메모리 버퍼에 추가합니다."""
+            nonlocal frame_offset, last_framenumber
+            
+            if last_framenumber != -1 and pkt.framenumber < last_framenumber - 100:
+                LOG.warning(f"QTM 프레임 카운터 리셋 감지: {last_framenumber} -> {pkt.framenumber}. 기준점을 재설정합니다.")
+                frame_offset = None
 
-                if bodies:
-                    for name, idx in bmap.items():
-                        if WANTED_BODY and name != WANTED_BODY: continue
-                        if idx < len(bodies) and bodies[idx]:
-                            pos, rot = bodies[idx]
-                            roll, pitch, yaw = rotation_to_rpy(rot.matrix)
-                            body_rows.setdefault(name, []).append(
-                                [relative_fnum, pos.x, pos.y, pos.z, roll, pitch, yaw]
-                            )
-                if markers:
-                    for i, m in enumerate(markers):
-                        if m is None: continue
-                        key = m_name_list[i] if i < len(m_name_list) else f"M{i}"
-                        marker_rows.setdefault(key, []).append([relative_fnum, m.x, m.y, m.z])
+            if frame_offset is None:
+                frame_offset = pkt.framenumber
+            
+            relative_fnum = pkt.framenumber - frame_offset + 1
+            last_framenumber = pkt.framenumber
 
-            await conn.stream_frames(components=["6d", "3d"], on_packet=on_packet)
-            LOG.info("데이터 수신을 시작합니다. 종료하려면 Ctrl+C를 누르세요.")
-            await asyncio.Future()
+            _, bodies = pkt.get_6d()
+            _, markers = pkt.get_3d_markers()
+
+            if bodies:
+                for name, idx in bmap.items():
+                    if WANTED_BODY and name != WANTED_BODY: continue
+                    if idx < len(bodies) and bodies[idx]:
+                        pos, rot = bodies[idx]
+                        roll, pitch, yaw = rotation_to_rpy(rot.matrix)
+                        body_rows.setdefault(name, []).append(
+                            [relative_fnum, pos.x, pos.y, pos.z, roll, pitch, yaw]
+                        )
+            if markers:
+                for i, m in enumerate(markers):
+                    if m is None: continue
+                    key = m_name_list[i] if i < len(m_name_list) else f"M{i}"
+                    marker_rows.setdefault(key, []).append([relative_fnum, m.x, m.y, m.z])
+
+        await conn.stream_frames(components=["6d", "3d"], on_packet=on_packet)
+        LOG.info("데이터 수신을 시작합니다. 종료하려면 Ctrl+C를 누르세요.")
+        await asyncio.Future()
 
     except asyncio.CancelledError:
         LOG.info("프로그램이 외부 신호에 의해 종료됩니다.")
@@ -173,7 +172,14 @@ async def main():
         saver_task.cancel()
         if conn and conn.has_transport():
             await conn.stream_frames_stop()
+            try:
+                # [수정] 제어권 해제 시 타임아웃 오류 방지
+                await conn.release_control()
+                LOG.info("QTM 제어권을 해제했습니다.")
+            except asyncio.TimeoutError:
+                LOG.warning("QTM 제어권 해제 실패 (타임아웃). 연결이 비정상적일 수 있습니다.")
             conn.disconnect()
+            
         LOG.info("\n🛑 스트리밍 종료. 남은 데이터를 최종 저장합니다...")
         flush_data_to_disk()
         LOG.info(f"✅ 모든 데이터 저장 완료 → {OUTDIR}")
