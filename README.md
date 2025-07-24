@@ -1,6 +1,6 @@
 # QTM 실시간 데이터 스트리머 (Real-time Data Streamer for QTM)
 
-Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid Body)와 3D 마커(Labeled Marker) 데이터를 스트리밍하여 CSV 파일로 저장하는 파이썬 스크립트입니다. QTM 내에서 별도의 녹화(Capture)를 수행하지 않고 라이브 데이터를 직접 가져오거나, 기존 `.qtm` 파일을 재생하여 데이터를 추출할 수 있습니다.
+Qualysys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid Body)와 3D 마커(Labeled Marker) 데이터를 스트리밍하여 CSV 파일로 저장하는 파이썬 스크립트입니다. 주기적 저장 기능으로 메모리 사용량을 관리하여, 장시간(수 시간 또는 하루 종일) 안정적으로 데이터를 녹화할 수 있도록 설계되었습니다.
 
 ## 주요 기능 ✨
 
@@ -10,8 +10,8 @@ Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid 
   - **자동 CSV 저장**:
       - 각 리지드 바디의 데이터(위치, 회전)는 개별 CSV 파일로 저장됩니다.
       - 모든 마커의 3D 위치 데이터는 하나의 통합된 CSV 파일로 저장됩니다.
-  - **데이터 보간**: 스트리밍 중 누락된 프레임이 있을 경우, 자동으로 선형 보간하여 빈 데이터를 채워줍니다.
   - **간편한 종료**: `Ctrl+C`를 누르면 데이터 수집을 안전하게 중단하고 즉시 저장합니다.
+  - **장시간 안정적 녹화**: 설정된 시간 간격마다 데이터를 파일에 저장하고 메모리를 비워, 프로그램 중단 없이 장시간 녹화가 가능합니다.
 
 ## 시스템 요구사항 💻
 
@@ -36,14 +36,17 @@ Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid 
 2.  **QTM 설정 확인**
 
       - QTM을 실행하고, 데이터를 받을 프로젝트를 엽니다.
-      - `Project Options` \> `Output` \> `Real-time server` 항목을 활성화(Enable)합니다.
-      - `Password`가 설정되어 있다면, 스크립트에서 사용해야 하므로 기억해두세요.
+      - `Project Options` \> `Processing` \> `Real-time Output` 에서 Client Control 항목을 활성화(Enable)합니다.
+      - Password 를 `Password`로 설정해 두었습니다. 별도의 Password 사용시 스크립트에서 사용해야 하므로 기억해두세요.
 
 ## 사용 방법 🚀
 
 1.  **스크립트 설정**
 
-    `Stream_Final.py` 파일을 열어 아래 `사용자 설정` 부분을 자신의 환경에 맞게 수정합니다.
+    `Stream_Final_0724.py` 파일을 열어 아래 `사용자 설정` 부분을 자신의 환경에 맞게 수정합니다.
+
+    - 파일명이 V2로 끝나는 파일은 CSV의 Frame 열이 1부터 저장되는 코드이며
+    - 그냥 Steam_Final_0724.py는 CSV의 Frame 열을 QTM의 실제 Frame을 받아와 저장하는 코드입니다.     
 
     ```python
     # ────────── 사용자 설정 ──────────
@@ -61,7 +64,7 @@ Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid 
     # ──────────────────────
     ```
 
-2.  **스크립트 실행**
+3.  **스크립트 실행**
 
     터미널에서 아래 명령어로 스크립트를 실행합니다.
 
@@ -69,7 +72,7 @@ Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid 
     python stream_6dof_JK_Final.py
     ```
 
-3.  **데이터 수집 및 저장**
+4.  **데이터 수집 및 저장**
 
       - 스크립트가 실행되면 "📡 실시간 스트리밍 시작..." 또는 "▶ ... 파일 재생 중..." 메시지가 나타나며 데이터 수집을 시작합니다.
       - 데이터 수집을 중단하고 싶을 때 터미널에서 `Ctrl + C`를 누릅니다.
@@ -98,5 +101,12 @@ Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid 
       - 파일 상단에 측정 시작 및 종료 시간이 `#` 주석으로 기록됩니다.
       - `Frame`: 프레임 번호
       - `<마커이름>_Pos_X`, `<마커이름>_Pos_Y`, `<마커이름>_Pos_Z`: 각 마커의 3D 위치 (mm)
+
+## ⚠️ 참고 사항
+
+  - RuntimeWarning 경고: 실행 중 invalid value encountered in det 라는 경고가 나타날 수 있습니다.
+  - 이는 마커 폐색(occlusion)으로 인해 QTM이 순간적으로 회전 값을 계산하지 못해 발생하는 현상으로, 코드가 이를 감지하여 해당 프레임의 회전 값을 NaN으로 안전하게 처리하므로 무시하셔도 괜찮습니다.
+
+데이터 보간(Interpolation): 이 스크립트는 원본 데이터를 최대한 손실 없이 저장하는 데 집중합니다. 폐색 등으로 인해 비어있는 값(NaN)을 채우는 보간 작업은, 데이터 수집이 모두 끝난 후에 저장된 CSV 파일을 이용해 별도의 후처리 과정에서 수행하는 것을 권장합니다.
 
 -----
