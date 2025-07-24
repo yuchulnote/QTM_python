@@ -43,7 +43,7 @@ Qualisys Track Manager (QTM)에서 실시간으로 6-DoF 리지드 바디(Rigid 
 
 1.  **스크립트 설정**
 
-    `stream_6dof_JK_Final.py` 파일을 열어 아래 `사용자 설정` 부분을 자신의 환경에 맞게 수정합니다.
+    `Stream_Final.py` 파일을 열어 아래 `사용자 설정` 부분을 자신의 환경에 맞게 수정합니다.
 
     ```python
     # ────────── 사용자 설정 ──────────
