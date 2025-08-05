@@ -156,7 +156,7 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
             'Peak_Time(s)': peak_time,
             'Start_Duration(s)': peak_time - start_time,
             'Stabilization_Time(s)': stabilization_start_time,
-            'Stabilization_Duration(s)': stabilization_start_time - start_time,
+            'Stabilization_Duration(s)': descent_start_time - stabilization_start_time,
             'Descent_Start_Time(s)': descent_start_time,
             'End_Time(s)': end_time,
             'Descent_Duration(s)': end_time - descent_start_time,
