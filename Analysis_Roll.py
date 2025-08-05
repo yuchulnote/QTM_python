@@ -142,7 +142,6 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
     if not filtered_humps:
         logging.warning(f"분석 완료: '{file_path.name}'에서 유의미한 움직임 구간을 찾지 못했습니다. 파라미터를 조정해보세요."); return
 
-    # --- [수정된 부분] CSV에 저장할 결과 데이터를 상세 버전으로 복원 ---
     analysis_results = []
     for i, hump in enumerate(filtered_humps):
         start_time = hump.get('start_frame', 0) / SAMPLING_RATE
@@ -162,7 +161,6 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
             'Descent_Duration(s)': end_time - descent_start_time,
             'Peak_Roll_Value(deg)': hump.get('peak_value', 0)
         })
-    # --- 수정 끝 ---
 
     analysis_df = pd.DataFrame(analysis_results)
     summary = pd.Series({'Total_Humps': len(filtered_humps)}, name='Summary')
