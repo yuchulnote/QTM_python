@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 TARGET_DIRECTORY = r"C:\Users\user\Desktop\real-Time\qtm_export_20250801_112825"
 
 # 데이터 샘플링 속도 (Hz).
-SAMPLING_RATE = 100.0
+SAMPLING_RATE = 120.0
 
 # 데이터 분석 시 평활화를 위한 윈도우 크기. 클수록 그래프가 부드러워짐.
 SMOOTHING_WINDOW = 30
@@ -130,7 +130,6 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
     filtered_humps = []
     min_duration_frames = MIN_PEAK_TO_END_DURATION_SECONDS * SAMPLING_RATE
     for i, hump in enumerate(all_humps):
-        # Peak부터 End까지의 시간 계산
         peak_to_end_duration_frames = hump.get('end_frame', 0) - hump.get('peak_frame', 0)
         
         if peak_to_end_duration_frames >= min_duration_frames:
@@ -143,6 +142,7 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
     if not filtered_humps:
         logging.warning(f"분석 완료: '{file_path.name}'에서 유의미한 움직임 구간을 찾지 못했습니다. 파라미터를 조정해보세요."); return
 
+    # --- [수정된 부분] CSV에 저장할 결과 데이터를 상세 버전으로 복원 ---
     analysis_results = []
     for i, hump in enumerate(filtered_humps):
         start_time = hump.get('start_frame', 0) / SAMPLING_RATE
@@ -151,11 +151,18 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
         descent_start_time = hump.get('descent_start_frame', 0) / SAMPLING_RATE
         end_time = hump.get('end_frame', 0) / SAMPLING_RATE
         analysis_results.append({
-            'Hump_Index': i + 1, 'Start_Time(s)': start_time, 'Peak_Time(s)': peak_time,
-            'Stabilization_Time(s)': stabilization_start_time, 'Stabilization_Duration(s)': stabilization_start_time - start_time,
-            'Descent_Start_Time(s)': descent_start_time, 'End_Time(s)': end_time,
-            'Descent_Duration(s)': end_time - descent_start_time, 'Peak_Roll_Value(deg)': hump.get('peak_value', 0)
+            'Hump_Index': i + 1,
+            'Start_Time(s)': start_time,
+            'Peak_Time(s)': peak_time,
+            'Start_Duration(s)': peak_time - start_time,
+            'Stabilization_Time(s)': stabilization_start_time,
+            'Stabilization_Duration(s)': stabilization_start_time - start_time,
+            'Descent_Start_Time(s)': descent_start_time,
+            'End_Time(s)': end_time,
+            'Descent_Duration(s)': end_time - descent_start_time,
+            'Peak_Roll_Value(deg)': hump.get('peak_value', 0)
         })
+    # --- 수정 끝 ---
 
     analysis_df = pd.DataFrame(analysis_results)
     summary = pd.Series({'Total_Humps': len(filtered_humps)}, name='Summary')
