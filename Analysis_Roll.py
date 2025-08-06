@@ -60,10 +60,10 @@ def create_debug_plot(df: pd.DataFrame, baseline: float, threshold: float, humps
     plt.grid(True, which='both', linestyle='--', linewidth=0.5)
     plt.tight_layout()
     
-    plot_filename = output_path.parent / f"{output_path.stem}_debug_plot.png"
+    plot_filename = output_path.parent / f"{output_path.stem}_plot.png"
     plt.savefig(plot_filename)
     plt.close()
-    logging.info(f"디버그 플롯이 '{plot_filename}'에 저장되었습니다.")
+    logging.info(f"플롯이 '{plot_filename}'에 저장되었습니다.")
 
 
 def analyze_roll_data(file_path: Path, output_dir: Path):
@@ -84,6 +84,18 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
     df['Time'] = df['Frame'] / SAMPLING_RATE
 
     baseline = None
+    
+    '''
+    코드 설명:
+    1. 데이터 프레임에서 평활화된 Roll 데이터와 시간 데이터를 생성합니다.
+    2. 동적 기준선을 탐색합니다.
+    3. 동적 기준선을 탐색하는 동안 안정 구간을 찾습니다.
+    4. 안정 구간을 찾으면 기준선을 설정합니다.
+    5. 기준선을 설정하면 움직임을 감지합니다.
+    6. 움직임을 감지하면 움직임의 시작, 피크, 안정 구간, 하강 구간, 종료 시점을 파악합니다.
+    7. 움직임의 시작, 피크, 안정 구간, 하강 구간, 종료 시점을 파악하면 움직임의 시작, 피크, 안정 구간, 하강 구간, 종료 시점을 파악합니다.
+    '''
+    
     for i in range(len(df) - MIN_STABLE_FRAMES):
         window = df['Roll_Smooth'].iloc[i : i + MIN_STABLE_FRAMES]
         if (window.abs() < BASELINE_ZERO_TOLERANCE).all():
