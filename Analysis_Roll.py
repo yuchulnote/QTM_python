@@ -146,6 +146,26 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
         new_baseline = hump.get('new_baseline')
         baseline_shifted = new_baseline is not None and not np.isclose(new_baseline, prev_baseline)
         
+        # Stabilization 구간의 평균 roll value 계산
+        stabilization_start_frame = hump.get('stabilization_start_frame', 0)
+        descent_start_frame = hump.get('descent_start_frame', 0)
+        
+        # Stabilization 구간이 유효한 경우에만 평균 계산
+        if stabilization_start_frame > 0 and descent_start_frame > stabilization_start_frame:
+            # Stabilization 구간의 데이터 추출 (stabilization_start_frame부터 descent_start_frame까지)
+            start_idx = df[df['Frame'] == stabilization_start_frame].index[0] if len(df[df['Frame'] == stabilization_start_frame]) > 0 else 0
+            end_idx = df[df['Frame'] == descent_start_frame].index[0] if len(df[df['Frame'] == descent_start_frame]) > 0 else len(df)
+            
+            if start_idx < end_idx and start_idx < len(df) and end_idx <= len(df):
+                stabilization_data = df['Roll_Smooth'].iloc[start_idx:end_idx]
+                avg_stabilization_roll = stabilization_data.mean()
+            else:
+                avg_stabilization_roll = hump.get('peak_value', 0)  # 기본값으로 peak value 사용
+                logging.warning(f"Stabilization 구간이 유효하지 않습니다. Peak value를 사용합니다: {avg_stabilization_roll:.2f}")
+        else:
+            avg_stabilization_roll = hump.get('peak_value', 0)  # 기본값으로 peak value 사용
+            logging.warning(f"Stabilization 구간이 유효하지 않습니다. Peak value를 사용합니다: {avg_stabilization_roll:.2f}")
+        
         analysis_results.append({
             'Hump_Index': i + 1,
             'Start_Time(s)': hump.get('start_frame', 0) / SAMPLING_RATE,
@@ -156,7 +176,7 @@ def analyze_roll_data(file_path: Path, output_dir: Path):
             'Descent_Start_Time(s)': hump.get('descent_start_frame', 0) / SAMPLING_RATE,
             'End_Time(s)': hump.get('end_frame', 0) / SAMPLING_RATE,
             'Descent_Duration(s)': (hump.get('end_frame', 0) - hump.get('descent_start_frame', 0)) / SAMPLING_RATE,
-            'Peak_Roll_Value(deg)': hump.get('peak_value', 0),
+            'Avg_Stabilization_Roll_Value(deg)': avg_stabilization_roll,
             'New_Baseline_Value(deg)': new_baseline if baseline_shifted else np.nan
         })
         if baseline_shifted: prev_baseline = new_baseline
