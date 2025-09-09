@@ -8,7 +8,7 @@ import matplotlib.image as mpimg
 
 # --- 분석 파라미터 설정 (이곳에서 모든 값을 조정하세요) ---
 TARGET_DIRECTORY = r"C:\Users\user\Desktop\real-Time\QTM_python\qtm_export_20250825_094548"
-SAMPLING_RATE = 120.0
+SAMPLING_RATE = 100.0
 SMOOTHING_WINDOW = 30
 RISE_THRESHOLD = 2.5
 STABILITY_TOLERANCE = 1.0
