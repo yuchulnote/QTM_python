@@ -1,0 +1,7 @@
+Recording Start Time: 2025-08-25T09:45:48.766595
+Recording End Time:   2025-08-25T09:54:01.188383
+
+--- Analysis Summary ---
+Device Earliest Start Time: 5.075 s
+Device Latest End Time:   393.225 s
+Total Operating Duration: 388.150 s
