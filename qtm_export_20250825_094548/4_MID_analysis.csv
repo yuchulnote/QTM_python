@@ -1,2 +1,4 @@
 Hump_Index,Start_Time(s),Peak_Time(s),Start_duration(s),Stabilization_Time(s),Stabilization_Duration(s),Descent_Start_Time(s),End_Time(s),Descent_Duration(s),Avg_Stabilization_Roll_Value(deg),New_Baseline_Value(deg),Caused_Baseline_Shift
-1,7.375,12.692,5.317,12.700,5.325,42.892,43.992,1.100,3.719,1.980,True
+1,8.608,12.758,4.150,12.767,4.158,44.075,44.458,0.383,3.680,0.845,True
+2,73.175,76.142,2.967,76.150,2.975,107.492,107.492,0.000,3.677,1.184,True
+3,137.092,139.717,2.625,139.725,2.633,170.850,170.850,0.000,3.681,1.195,True
